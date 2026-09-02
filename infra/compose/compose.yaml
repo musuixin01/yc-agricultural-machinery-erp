@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: yc_erp
+      POSTGRES_USER: yc_erp
+      POSTGRES_PASSWORD: yc_erp_dev
+    ports:
+      - "15432:5432"
+    volumes:
+      - yc_erp_postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U yc_erp -d yc_erp"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  yc_erp_postgres:
