@@ -12,6 +12,7 @@ import {
 import type { CreateProductDto } from "./dto/create-product.dto.js";
 import type { QueryProductsDto } from "./dto/query-products.dto.js";
 import type { UpdateProductStatusDto } from "./dto/update-product-status.dto.js";
+import type { UpdateProductDto } from "./dto/update-product.dto.js";
 
 @Injectable()
 export class CatalogService {
@@ -40,25 +41,53 @@ export class CatalogService {
     try {
       return await this.repository.create(input);
     } catch (error: unknown) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
-        throw new ConflictException({
-          code: "CATALOG_DUPLICATE",
-          detail: "商品编码或条码已存在。",
-        });
-      }
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2003"
-      ) {
-        throw new ConflictException({
-          code: "CATALOG_REFERENCE_INVALID",
-          detail: "分类、品牌或单位不存在。",
-        });
-      }
+      this.mapPersistenceError(error);
       throw error;
+    }
+  }
+
+  async update(id: string, input: UpdateProductDto) {
+    try {
+      const result = await this.repository.update(id, input);
+      if (typeof result !== "string") return result;
+      if (result === "NOT_FOUND")
+        throw new NotFoundException({
+          code: "CATALOG_PRODUCT_NOT_FOUND",
+          detail: "商品不存在。",
+        });
+      if (result === "BASE_UNIT_LOCKED")
+        throw new ConflictException({
+          code: "CATALOG_BASE_UNIT_LOCKED",
+          detail: "该商品已经发生业务，基本单位不能修改。其他资料仍可修改。",
+        });
+      throw new ConflictException({
+        code: "CATALOG_VERSION_CONFLICT",
+        detail: "商品已被其他人修改，请刷新后重试。",
+      });
+    } catch (error: unknown) {
+      this.mapPersistenceError(error);
+      throw error;
+    }
+  }
+
+  private mapPersistenceError(error: unknown) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      throw new ConflictException({
+        code: "CATALOG_DUPLICATE",
+        detail: "商品编码或条码已存在。",
+      });
+    }
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2003"
+    ) {
+      throw new ConflictException({
+        code: "CATALOG_REFERENCE_INVALID",
+        detail: "分类、品牌或单位不存在。",
+      });
     }
   }
 

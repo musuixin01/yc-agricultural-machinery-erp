@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CatalogService } from "../src/modules/catalog/catalog.service.js";
 import type { CatalogRepository } from "../src/modules/catalog/catalog.repository.js";
 import type { ProductView } from "../src/modules/catalog/catalog.types.js";
+import type { UpdateProductDto } from "../src/modules/catalog/dto/update-product.dto.js";
 
 const product: ProductView = {
   id: "00000000-0000-4000-8000-000000000001",
@@ -44,6 +45,9 @@ function repository(
     list: vi.fn(),
     findById: vi.fn().mockResolvedValue(product),
     create: vi.fn().mockResolvedValue(product),
+    update: vi
+      .fn()
+      .mockResolvedValue({ ...product, name: "更新后的商品", version: 2 }),
     updateStatus: vi
       .fn()
       .mockResolvedValue({ ...product, status: "INACTIVE", version: 2 }),
@@ -53,6 +57,14 @@ function repository(
 }
 
 describe("CatalogService", () => {
+  const updateInput: UpdateProductDto = {
+    version: 1,
+    code: product.code,
+    name: "更新后的商品",
+    type: product.type,
+    categoryId: product.category.id,
+    baseUnitId: product.baseUnit.id,
+  };
   it("returns a product by id", async () => {
     await expect(
       new CatalogService(repository()).get(product.id),
@@ -72,5 +84,24 @@ describe("CatalogService", () => {
     await expect(
       service.updateStatus(product.id, { status: "INACTIVE", version: 7 }),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+  it("updates product master data", async () => {
+    await expect(
+      new CatalogService(repository()).update(product.id, updateInput),
+    ).resolves.toMatchObject({ name: "更新后的商品", version: 2 });
+  });
+  it("rejects stale product edits", async () => {
+    await expect(
+      new CatalogService(
+        repository({ update: vi.fn().mockResolvedValue("VERSION_CONFLICT") }),
+      ).update(product.id, updateInput),
+    ).rejects.toMatchObject({ response: { code: "CATALOG_VERSION_CONFLICT" } });
+  });
+  it("protects the base unit after business history exists", async () => {
+    await expect(
+      new CatalogService(
+        repository({ update: vi.fn().mockResolvedValue("BASE_UNIT_LOCKED") }),
+      ).update(product.id, updateInput),
+    ).rejects.toMatchObject({ response: { code: "CATALOG_BASE_UNIT_LOCKED" } });
   });
 });

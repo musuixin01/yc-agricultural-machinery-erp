@@ -4,6 +4,7 @@ import {
   type CreateProductInput,
   type Product,
   type ProductStatus,
+  type UpdateProductInput,
 } from "./catalog-api";
 
 export function useProducts(search: string, categoryId = "", status = "") {
@@ -23,6 +24,20 @@ export function useCreateProduct() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateProductInput) => catalogApi.create(input),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: ["catalog", "products"] }),
+  });
+}
+export function useUpdateProduct() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      product,
+      input,
+    }: {
+      product: Product;
+      input: UpdateProductInput;
+    }) => catalogApi.update(product, input),
     onSuccess: () =>
       client.invalidateQueries({ queryKey: ["catalog", "products"] }),
   });

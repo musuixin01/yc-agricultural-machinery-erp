@@ -15,6 +15,7 @@ import { CatalogService } from "./catalog.service.js";
 import { CreateProductDto } from "./dto/create-product.dto.js";
 import { QueryProductsDto } from "./dto/query-products.dto.js";
 import { UpdateProductStatusDto } from "./dto/update-product-status.dto.js";
+import { UpdateProductDto } from "./dto/update-product.dto.js";
 import { AuthenticationGuard } from "../identity/authentication.guard.js";
 import { PermissionsGuard } from "../identity/permissions.guard.js";
 import { RequirePermissions } from "../identity/require-permissions.decorator.js";
@@ -50,6 +51,15 @@ export class CatalogController {
   @ApiCreatedResponse({ description: "创建商品" })
   create(@Body() input: CreateProductDto) {
     return this.service.create(input);
+  }
+
+  @Patch("products/:id")
+  @RequirePermissions("catalog.write")
+  update(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() input: UpdateProductDto,
+  ) {
+    return this.service.update(id, input);
   }
 
   @Patch("products/:id/status")

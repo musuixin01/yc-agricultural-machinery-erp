@@ -8203,6 +8203,27 @@ select:focus-visible {
   color: #205e3c !important;
   font-weight: 700;
 }
+.catalog-edit-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid #dce5de;
+  border-radius: 9px;
+  background: #fff;
+  color: #35684a;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease;
+}
+.catalog-edit-button:hover {
+  border-color: #abc4b2;
+  background: #f3f8f4;
+}
 
 .c-logo > span {
   background: var(--yc-green-900);
@@ -8872,6 +8893,30 @@ html {
   gap: 12px;
   padding: 10px 22px 22px;
 }
+.catalog-edit-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #dfe9e1;
+  border-radius: 11px;
+  background: #f4f8f4;
+  color: #587062;
+  font-size: 10px;
+  line-height: 1.55;
+}
+.catalog-edit-note svg {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  color: #397351;
+}
+.catalog-edit-dialog footer .primary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .catalog-dialog label {
   display: grid;
   gap: 6px;
@@ -8946,6 +8991,17 @@ html {
   }
   .catalog-dialog form {
     padding-bottom: calc(22px + env(safe-area-inset-bottom));
+  }
+  .catalog-edit-dialog .catalog-form-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .catalog-edit-dialog input,
+  .catalog-edit-dialog select {
+    height: 44px;
+    font-size: 16px;
+  }
+  .catalog-edit-dialog footer button {
+    min-height: 44px;
   }
 }
 

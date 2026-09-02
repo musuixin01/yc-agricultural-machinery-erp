@@ -12,6 +12,7 @@ import {
   Menu,
   MessageCircle,
   PackageOpen,
+  Pencil,
   Plus,
   ReceiptText,
   ScanBarcode,
@@ -30,6 +31,8 @@ import { debts, metrics, type Screen } from "../mockData";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CreateProductDialog } from "../modules/catalog/CreateProductDialog";
+import { EditProductDialog } from "../modules/catalog/EditProductDialog";
+import type { Product } from "../modules/catalog/catalog-api";
 import {
   useCatalogReferences,
   useProducts,
@@ -416,6 +419,7 @@ function CInventory({
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<Product | null>(null);
   const products = useProducts(search, categoryId);
   const references = useCatalogReferences();
   return (
@@ -535,8 +539,8 @@ function CInventory({
                 </span>
               </p>
             </div>
-            <button aria-label="查看商品">
-              <ChevronRight />
+            <button aria-label={`编辑 ${p.name}`} onClick={() => setEditing(p)}>
+              <Pencil />
             </button>
           </article>
         ))}
@@ -549,6 +553,7 @@ function CInventory({
         新增商品
       </button>
       <CreateProductDialog open={creating} onClose={() => setCreating(false)} />
+      <EditProductDialog product={editing} onClose={() => setEditing(null)} />
     </div>
   );
 }

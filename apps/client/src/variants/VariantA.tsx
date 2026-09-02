@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Menu,
   PackageCheck,
+  Pencil,
   Plus,
   ScanLine,
   Search,
@@ -23,6 +24,8 @@ import {
 import { activities, debts, metrics, type Screen } from "../mockData";
 import { lazy, Suspense, useState } from "react";
 import { CreateProductDialog } from "../modules/catalog/CreateProductDialog";
+import { EditProductDialog } from "../modules/catalog/EditProductDialog";
+import type { Product } from "../modules/catalog/catalog-api";
 import {
   useCatalogReferences,
   useProducts,
@@ -594,6 +597,7 @@ function AInventory() {
   const [categoryId, setCategoryId] = useState("");
   const [productStatus, setProductStatus] = useState("");
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<Product | null>(null);
   const products = useProducts(search, categoryId, productStatus);
   const references = useCatalogReferences();
   const status = useSetProductStatus();
@@ -700,6 +704,7 @@ function AInventory() {
                   <th>安全库存</th>
                   <th>零售价</th>
                   <th>状态</th>
+                  <th aria-label="操作" />
                 </tr>
               </thead>
               <tbody>
@@ -754,6 +759,16 @@ function AInventory() {
                         {p.status === "ACTIVE" ? "在售" : "已停用"}
                       </button>
                     </td>
+                    <td>
+                      <button
+                        className="catalog-edit-button"
+                        onClick={() => setEditing(p)}
+                        aria-label={`编辑 ${p.name}`}
+                      >
+                        <Pencil size={15} />
+                        编辑
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -765,6 +780,7 @@ function AInventory() {
         )}
       </section>
       <CreateProductDialog open={creating} onClose={() => setCreating(false)} />
+      <EditProductDialog product={editing} onClose={() => setEditing(null)} />
     </div>
   );
 }

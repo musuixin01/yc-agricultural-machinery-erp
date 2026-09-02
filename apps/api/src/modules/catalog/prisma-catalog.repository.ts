@@ -3,7 +3,11 @@ import type { Prisma } from "../../generated/prisma/client.js";
 import { PrismaService } from "../../infrastructure/prisma/prisma.service.js";
 import type { CreateProductDto } from "./dto/create-product.dto.js";
 import type { QueryProductsDto } from "./dto/query-products.dto.js";
-import type { CatalogRepository } from "./catalog.repository.js";
+import type {
+  CatalogRepository,
+  ProductUpdateResult,
+} from "./catalog.repository.js";
+import type { UpdateProductDto } from "./dto/update-product.dto.js";
 import type {
   ProductPage,
   ProductStatus,
@@ -147,6 +151,70 @@ export class PrismaCatalogRepository implements CatalogRepository {
       include: productInclude,
     });
     return toView(item);
+  }
+
+  async update(
+    id: string,
+    input: UpdateProductDto,
+  ): Promise<ProductUpdateResult> {
+    return this.prisma.$transaction(async (transaction) => {
+      const current = await transaction.product.findUnique({
+        where: { id },
+        select: { id: true, version: true, baseUnitId: true },
+      });
+      if (!current) return "NOT_FOUND";
+      if (current.version !== input.version) return "VERSION_CONFLICT";
+      if (current.baseUnitId !== input.baseUnitId) {
+        const [inventoryCount, purchaseCount, salesCount] = await Promise.all([
+          transaction.inventoryLedgerEntry.count({ where: { productId: id } }),
+          transaction.purchaseLine.count({ where: { productId: id } }),
+          transaction.salesLine.count({ where: { productId: id } }),
+        ]);
+        if (inventoryCount + purchaseCount + salesCount > 0)
+          return "BASE_UNIT_LOCKED";
+      }
+      const updated = await transaction.product.updateMany({
+        where: { id, version: input.version },
+        data: {
+          code: input.code,
+          name: input.name,
+          mnemonicCode: input.mnemonicCode || null,
+          type: input.type,
+          model: input.model || null,
+          specification: input.specification || null,
+          categoryId: input.categoryId,
+          brandId: input.brandId || null,
+          baseUnitId: input.baseUnitId,
+          retailPrice: input.retailPrice ?? "0",
+          wholesalePrice: input.wholesalePrice ?? "0",
+          defaultPurchasePrice: input.defaultPurchasePrice ?? "0",
+          minimumSalePrice: input.minimumSalePrice ?? "0",
+          safetyStock: input.safetyStock ?? "0",
+          attributes:
+            input.attributes === undefined
+              ? undefined
+              : (input.attributes as Prisma.InputJsonValue),
+          version: { increment: 1 },
+        },
+      });
+      if (updated.count !== 1) return "VERSION_CONFLICT";
+      await transaction.productBarcode.deleteMany({ where: { productId: id } });
+      if (input.barcodes?.length) {
+        const primaryCount = input.barcodes.filter((x) => x.isPrimary).length;
+        await transaction.productBarcode.createMany({
+          data: input.barcodes.map((barcode, index) => ({
+            productId: id,
+            barcode: barcode.barcode,
+            isPrimary: primaryCount ? Boolean(barcode.isPrimary) : index === 0,
+          })),
+        });
+      }
+      const product = await transaction.product.findUniqueOrThrow({
+        where: { id },
+        include: productInclude,
+      });
+      return toView(product);
+    });
   }
 
   async updateStatus(
