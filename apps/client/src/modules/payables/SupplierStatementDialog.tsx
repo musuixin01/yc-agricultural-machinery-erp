@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, lazy, Suspense } from "react";
 import { createPortal } from "react-dom";
 import {
+  Banknote,
   Download,
   FileText,
   Printer,
@@ -11,12 +12,20 @@ import {
 import { useBusinessProfile } from "../administration/use-administration";
 import { useParties } from "../parties/use-parties";
 import { financialMoney } from "../shared/financial-voucher";
+import { CreateSupplierPaymentDialog } from "./CreateSupplierPaymentDialog";
+import type { SupplierPayment } from "./payables-api";
 import {
   createSupplierStatementPng,
   openSupplierStatementPrint,
   supplierStatementFileName,
 } from "./supplier-statement";
 import { useSupplierStatement } from "./use-payables";
+
+const SupplierPaymentVoucherDialog = lazy(() =>
+  import("./SupplierPaymentVoucherDialog").then((module) => ({
+    default: module.SupplierPaymentVoucherDialog,
+  })),
+);
 
 function todayInChina() {
   return new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -42,6 +51,11 @@ export function SupplierStatementDialog({
   const [busy, setBusy] = useState<"save" | "share" | "">("");
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [voucherPayment, setVoucherPayment] = useState<SupplierPayment | null>(
+    null,
+  );
+
   const closeButton = useRef<HTMLButtonElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
   const suppliers = useParties("", "SUPPLIER");
@@ -122,6 +136,8 @@ export function SupplierStatementDialog({
       setBusy("");
     }
   }
+
+  const closingBalanceNum = Number(statement.data?.summary.closingBalance || 0);
 
   return createPortal(
     <div
@@ -228,10 +244,21 @@ export function SupplierStatementDialog({
                       : ""}
                   </span>
                 </div>
-                <small>
-                  对账期间 {statement.data.period.dateFrom} 至{" "}
-                  {statement.data.period.dateTo}
-                </small>
+                <div className="statement-customer-right">
+                  <small>
+                    对账期间 {statement.data.period.dateFrom} 至{" "}
+                    {statement.data.period.dateTo}
+                  </small>
+                  {closingBalanceNum > 0 && (
+                    <button
+                      type="button"
+                      className="statement-pay-btn"
+                      onClick={() => setPaymentOpen(true)}
+                    >
+                      <Banknote size={14} /> 登记付款核销
+                    </button>
+                  )}
+                </div>
               </section>
               <section className="customer-statement-summary">
                 {[
@@ -300,6 +327,16 @@ export function SupplierStatementDialog({
           </p>
         )}
         <footer className="customer-statement-actions">
+          {closingBalanceNum > 0 && (
+            <button
+              type="button"
+              className="statement-action-pay"
+              onClick={() => setPaymentOpen(true)}
+            >
+              <Banknote size={15} /> 立即付款结算 (¥
+              {financialMoney(statement.data?.summary.closingBalance)})
+            </button>
+          )}
           <button
             type="button"
             disabled={!statement.data || Boolean(busy)}
@@ -333,6 +370,27 @@ export function SupplierStatementDialog({
             {busy === "share" ? "生成中…" : "分享/微信"}
           </button>
         </footer>
+
+        {paymentOpen && (
+          <CreateSupplierPaymentDialog
+            open={paymentOpen}
+            initialSupplierId={supplierId}
+            onClose={() => setPaymentOpen(false)}
+            onPosted={(postedPayment) => {
+              statement.refetch();
+              setVoucherPayment(postedPayment);
+            }}
+          />
+        )}
+
+        {voucherPayment && (
+          <Suspense fallback={null}>
+            <SupplierPaymentVoucherDialog
+              payment={voucherPayment}
+              onClose={() => setVoucherPayment(null)}
+            />
+          </Suspense>
+        )}
       </section>
     </div>,
     document.body,

@@ -190,188 +190,88 @@ export function DashboardWorkspace({
 
   return (
     <div className={`real-dashboard dashboard-${layout} yc-unified-dashboard`}>
+      {/* 1. Header & Period Toolbar — Ultra Compact, Low Whitespace */}
       <section className="dashboard-head yc-dashboard-head">
-        <div>
-          <span>
-            {new Intl.DateTimeFormat("zh-CN", {
-              month: "long",
-              day: "numeric",
-              weekday: "long",
-            }).format(new Date())}
-          </span>
-          <h1>你好，{auth.user.displayName}</h1>
-          <p>
-            {attentionCount > 0
-              ? `有 ${attentionCount} 项经营事项需要关注。`
-              : "门店经营正常，暂时没有紧急事项。"}
-          </p>
-        </div>
-        <button
-          className="dashboard-sale-button"
-          onClick={() => onScreenChange("sales")}
-        >
-          <ShoppingCart aria-hidden="true" />
-          销售开单
-        </button>
-      </section>
-
-      <section className="yc-priority-section">
-        <article className="yc-dashboard-panel yc-reminders">
-          <header>
-            <div>
-              <h2>待办提醒</h2>
-              <p>需要优先处理的经营事项</p>
-            </div>
-            <span>{attentionCount}</span>
-          </header>
-          <div className="yc-reminder-list">
-            {hasBackupFailure && (
-              <button
-                onClick={() => {
-                  sessionStorage.setItem("yc-settings-tab", "backups");
-                  onScreenChange("staff");
-                }}
-              >
-                <span className="todo-icon red">
-                  <HardDrive aria-hidden="true" />
-                </span>
-                <div>
-                  <strong>数据备份需要处理</strong>
-                  <small>
-                    {backupPolicy.data?.lastSecondaryCopyFailureAt
-                      ? "第二存储复制失败，点击查看原因"
-                      : "自动备份失败，点击查看原因"}
-                  </small>
-                </div>
-                <ChevronRight aria-hidden="true" />
-              </button>
-            )}
-            {data.receivables.overdueCount > 0 && (
-              <button onClick={() => onScreenChange("debts")}>
-                <span className="todo-icon red">
-                  <Clock3 />
-                </span>
-                <div>
-                  <strong>
-                    {data.receivables.overdueCount} 笔客户欠款已逾期
-                  </strong>
-                  <small>合计 {money(data.receivables.overdueAmount)}</small>
-                </div>
-                <ChevronRight />
-              </button>
-            )}
-            {data.inventory.lowStockProductCount > 0 && (
-              <button onClick={() => onScreenChange("stock")}>
-                <span className="todo-icon orange">
-                  <Boxes />
-                </span>
-                <div>
-                  <strong>
-                    {data.inventory.lowStockProductCount} 种商品库存偏低
-                  </strong>
-                  <small>
-                    {data.inventory.negativeStockProductCount > 0
-                      ? `其中 ${data.inventory.negativeStockProductCount} 种负库存`
-                      : "建议检查补货"}
-                  </small>
-                </div>
-                <ChevronRight />
-              </button>
-            )}
-            {attentionCount === 0 && (
-              <p className="dashboard-list-empty yc-all-clear">
-                目前没有需要紧急处理的事项。
-              </p>
+        <div className="yc-head-text">
+          <div className="yc-head-user-row">
+            <span className="yc-head-avatar-dot" aria-hidden="true" />
+            <strong className="yc-head-name">
+              {auth.user.displayName.replace(/\s*\(.*?\)\s*/g, "")}
+            </strong>
+            {(() => {
+              const role = (auth.user.roles?.[0] || "STAFF").toUpperCase();
+              if (role === "OWNER" || role === "MANAGER") {
+                return (
+                  <span className="yc-head-role-pill role-owner">负责人</span>
+                );
+              }
+              if (role === "SALES") {
+                return (
+                  <span className="yc-head-role-pill role-sales">销售</span>
+                );
+              }
+              if (role === "WAREHOUSE") {
+                return (
+                  <span className="yc-head-role-pill role-warehouse">库管</span>
+                );
+              }
+              if (role === "FINANCE") {
+                return (
+                  <span className="yc-head-role-pill role-finance">财务</span>
+                );
+              }
+              return (
+                <span className="yc-head-role-pill role-default">员工</span>
+              );
+            })()}
+          </div>
+          <div className="yc-head-meta-row">
+            <span className="yc-head-date">
+              {new Intl.DateTimeFormat("zh-CN", {
+                month: "numeric",
+                day: "numeric",
+                weekday: "short",
+              }).format(new Date())}
+            </span>
+            <span className="yc-head-divider">·</span>
+            {attentionCount > 0 ? (
+              <span className="yc-head-tag warn">{attentionCount}项待办</span>
+            ) : (
+              <span className="yc-head-tag ok">经营正常</span>
             )}
           </div>
-        </article>
-      </section>
-
-      <section className="c-quick-section yc-quick-section yc-sequence-section">
-        <div className="c-section-title">
-          <div>
-            <h2>常用功能</h2>
-            <p>一步完成日常经营</p>
-          </div>
         </div>
-        <div className="c-actions yc-dashboard-actions">
-          <button onClick={openScanSale}>
-            <span className="green">
-              <ScanLine aria-hidden="true" />
-            </span>
-            <strong>扫码开单</strong>
-            <small>快速销售</small>
-          </button>
-          <button onClick={() => onScreenChange("purchasing")}>
-            <span className="blue">
-              <Truck aria-hidden="true" />
-            </span>
-            <strong>采购入库</strong>
-            <small>登记到货</small>
-          </button>
-          <button onClick={() => onScreenChange("debts")}>
-            <span className="amber">
-              <CircleDollarSign aria-hidden="true" />
-            </span>
-            <strong>客户收款</strong>
-            <small>核销欠款</small>
-          </button>
-          <button onClick={() => onScreenChange("stock")}>
-            <span className="purple">
-              <Boxes aria-hidden="true" />
-            </span>
-            <strong>查看库存</strong>
-            <small>{data.inventory.lowStockProductCount} 项预警</small>
-          </button>
-        </div>
-      </section>
-
-      <section className="yc-sequence-section">
-        <article className="yc-dashboard-panel yc-recent-sales yc-recent-sales-wide">
-          <header>
-            <div>
-              <h2>最近销售</h2>
-              <p>来自正式销售单</p>
-            </div>
-            <button onClick={() => onScreenChange("sales")}>
-              全部 <ChevronRight />
-            </button>
-          </header>
-          <div className="yc-recent-list">
-            {data.recentSales.map((item) => (
+        <div className="yc-head-controls">
+          <div className="dashboard-period" aria-label="统计期间">
+            {(Object.keys(periodLabels) as DashboardPeriod[]).map((key) => (
               <button
-                className="yc-sale-row"
-                key={item.id}
-                onClick={() => onScreenChange("sales")}
+                key={key}
+                className={period === key ? "active" : ""}
+                onClick={() => setPeriod(key)}
               >
-                <span>{item.customerNameSnapshot?.slice(0, 1) || "客"}</span>
-                <div>
-                  <strong>{item.customerNameSnapshot || "散客"}</strong>
-                  <small>
-                    {item.documentNumber} ·{" "}
-                    {item.status === "REVERSED"
-                      ? "已冲销"
-                      : item.settlementType === "CREDIT"
-                        ? "客户赊账"
-                        : "现结"}
-                  </small>
-                </div>
-                <b>{money(item.totalAmount)}</b>
+                {periodLabels[key]}
               </button>
             ))}
           </div>
-          {data.recentSales.length === 0 && (
-            <p className="dashboard-list-empty">还没有正式销售记录。</p>
-          )}
-        </article>
+          <button
+            className="dashboard-refresh"
+            aria-label="刷新经营数据"
+            onClick={() => void query.refetch()}
+            disabled={query.isFetching}
+          >
+            <RefreshCw className={query.isFetching ? "spinning" : ""} />
+            {layout === "desktop" && <span>刷新</span>}
+          </button>
+        </div>
       </section>
 
-      <section className="yc-sequence-section">
-        <article className="yc-dashboard-panel yc-trend-panel yc-trend-wide">
+      {/* 2. Business Trend Panel (Placed at the very TOP as requested) */}
+      <section className="yc-sequence-section yc-trend-top-section">
+        <article className="yc-dashboard-panel yc-trend-panel">
           <header>
             <div>
               <h2>经营趋势</h2>
-              <p>{periodLabels[period]}正式销售净额</p>
+              <p>{periodLabels[period]}正式销售净额走势</p>
             </div>
             {trendHasActivity && (
               <div className="yc-chart-legend">
@@ -416,8 +316,8 @@ export function DashboardWorkspace({
                       x2="0"
                       y2="1"
                     >
-                      <stop offset="0" stopColor="#3f8a60" stopOpacity=".18" />
-                      <stop offset="1" stopColor="#3f8a60" stopOpacity="0" />
+                      <stop offset="0" stopColor="#246d47" stopOpacity=".16" />
+                      <stop offset="1" stopColor="#246d47" stopOpacity="0" />
                     </linearGradient>
                   </defs>
                   {areaPath && <path className="yc-chart-area" d={areaPath} />}
@@ -453,31 +353,159 @@ export function DashboardWorkspace({
         </article>
       </section>
 
-      <section className="yc-bottom-summary" aria-label="期间经营汇总">
-        <div className="dashboard-toolbar yc-dashboard-toolbar">
-          <div className="dashboard-period" aria-label="统计期间">
-            {(Object.keys(periodLabels) as DashboardPeriod[]).map((key) => (
+      {/* 3. Quick Actions Bar */}
+      <section className="c-quick-section yc-quick-section">
+        <div className="c-actions yc-dashboard-actions">
+          <button onClick={openScanSale}>
+            <span className="green">
+              <ScanLine aria-hidden="true" />
+            </span>
+            <strong>扫码开单</strong>
+            <small>快捷销售</small>
+          </button>
+          <button onClick={() => onScreenChange("purchasing")}>
+            <span className="blue">
+              <Truck aria-hidden="true" />
+            </span>
+            <strong>采购入库</strong>
+            <small>到货登记</small>
+          </button>
+          <button onClick={() => onScreenChange("debts")}>
+            <span className="amber">
+              <CircleDollarSign aria-hidden="true" />
+            </span>
+            <strong>客户收款</strong>
+            <small>核销欠款</small>
+          </button>
+          <button onClick={() => onScreenChange("stock")}>
+            <span className="purple">
+              <Boxes aria-hidden="true" />
+            </span>
+            <strong>库存流水</strong>
+            <small>{data.inventory.lowStockProductCount} 项预警</small>
+          </button>
+        </div>
+      </section>
+
+      {/* 4. Recent Sales */}
+      <section className="yc-sequence-section">
+        <article className="yc-dashboard-panel yc-recent-sales">
+          <header>
+            <div>
+              <h2>最近销售</h2>
+              <p>已过账销售单</p>
+            </div>
+            <button
+              className="yc-panel-more"
+              onClick={() => onScreenChange("sales")}
+            >
+              全部 <ChevronRight />
+            </button>
+          </header>
+          <div className="yc-recent-list">
+            {data.recentSales.slice(0, 4).map((item) => (
               <button
-                key={key}
-                className={period === key ? "active" : ""}
-                onClick={() => setPeriod(key)}
+                className="yc-sale-row"
+                key={item.id}
+                onClick={() => onScreenChange("sales")}
               >
-                {periodLabels[key]}
+                <span className="yc-sale-avatar">
+                  {item.customerNameSnapshot?.slice(0, 1) || "客"}
+                </span>
+                <div className="yc-sale-info">
+                  <strong>{item.customerNameSnapshot || "散客"}</strong>
+                  <small>
+                    {item.documentNumber} ·{" "}
+                    {item.status === "REVERSED"
+                      ? "已冲销"
+                      : item.settlementType === "CREDIT"
+                        ? "赊账"
+                        : "现结"}
+                  </small>
+                </div>
+                <b className="yc-sale-amount">{money(item.totalAmount)}</b>
               </button>
             ))}
           </div>
-          <button
-            className="dashboard-refresh"
-            aria-label="刷新经营数据"
-            onClick={() => void query.refetch()}
-            disabled={query.isFetching}
-          >
-            <RefreshCw className={query.isFetching ? "spinning" : ""} />
-            {layout === "desktop" && "刷新"}
-          </button>
-        </div>
+          {data.recentSales.length === 0 && (
+            <p className="dashboard-list-empty">还没有正式销售记录。</p>
+          )}
+        </article>
+      </section>
 
-        <div className="yc-kpi-grid" aria-label="经营核心指标">
+      {/* 5. Priority Reminders (Placed after Recent Sales) */}
+      {attentionCount > 0 && (
+        <section className="yc-priority-section">
+          <article className="yc-dashboard-panel yc-reminders">
+            <header>
+              <div>
+                <h2>待办提醒</h2>
+                <p>需要跟进的经营事项</p>
+              </div>
+              <span className="yc-badge-count">{attentionCount}</span>
+            </header>
+            <div className="yc-reminder-list">
+              {hasBackupFailure && (
+                <button
+                  onClick={() => {
+                    sessionStorage.setItem("yc-settings-tab", "backups");
+                    onScreenChange("staff");
+                  }}
+                >
+                  <span className="todo-icon red">
+                    <HardDrive aria-hidden="true" />
+                  </span>
+                  <div>
+                    <strong>数据备份需要处理</strong>
+                    <small>
+                      {backupPolicy.data?.lastSecondaryCopyFailureAt
+                        ? "第二存储复制失败，点击查看原因"
+                        : "自动备份失败，点击查看原因"}
+                    </small>
+                  </div>
+                  <ChevronRight aria-hidden="true" />
+                </button>
+              )}
+              {data.receivables.overdueCount > 0 && (
+                <button onClick={() => onScreenChange("debts")}>
+                  <span className="todo-icon red">
+                    <Clock3 />
+                  </span>
+                  <div>
+                    <strong>
+                      {data.receivables.overdueCount} 笔客户欠款已逾期
+                    </strong>
+                    <small>合计 {money(data.receivables.overdueAmount)}</small>
+                  </div>
+                  <ChevronRight />
+                </button>
+              )}
+              {data.inventory.lowStockProductCount > 0 && (
+                <button onClick={() => onScreenChange("stock")}>
+                  <span className="todo-icon orange">
+                    <Boxes />
+                  </span>
+                  <div>
+                    <strong>
+                      {data.inventory.lowStockProductCount} 种商品库存偏低
+                    </strong>
+                    <small>
+                      {data.inventory.negativeStockProductCount > 0
+                        ? `其中 ${data.inventory.negativeStockProductCount} 种负库存`
+                        : "建议检查补货"}
+                    </small>
+                  </div>
+                  <ChevronRight />
+                </button>
+              )}
+            </div>
+          </article>
+        </section>
+      )}
+
+      {/* 6. Core 4 KPI Grid (Placed at the very BOTTOM as requested) */}
+      <section className="yc-kpi-section" aria-label="经营核心指标">
+        <div className="yc-kpi-grid">
           <button
             className="yc-kpi-card sales"
             onClick={() => onScreenChange("sales")}
@@ -485,7 +513,7 @@ export function DashboardWorkspace({
             <span className="yc-kpi-icon">
               <ShoppingCart aria-hidden="true" />
             </span>
-            <div>
+            <div className="yc-kpi-body">
               <small>{flowLabel}销售净额</small>
               <strong>{money(data.sales.net)}</strong>
               <p className={trendInfo?.direction ?? "flat"}>
@@ -495,10 +523,10 @@ export function DashboardWorkspace({
                   <TrendingDown aria-hidden="true" />
                 ) : null}
                 {trendInfo?.label ?? "暂无昨日对比"}
-                <em>退货 {money(data.sales.returns)}</em>
               </p>
             </div>
           </button>
+
           <button
             className="yc-kpi-card receivable"
             onClick={() => onScreenChange("debts")}
@@ -506,16 +534,17 @@ export function DashboardWorkspace({
             <span className="yc-kpi-icon">
               <CircleDollarSign aria-hidden="true" />
             </span>
-            <div>
+            <div className="yc-kpi-body">
               <small>客户欠款</small>
               <strong>{money(data.receivables.outstanding)}</strong>
-              <p>
+              <p className={data.receivables.overdueCount > 0 ? "warn" : ""}>
                 {data.receivables.overdueCount > 0
                   ? `${data.receivables.overdueCount} 笔已逾期`
                   : "暂无逾期"}
               </p>
             </div>
           </button>
+
           <button
             className="yc-kpi-card payable"
             onClick={() => onScreenChange("payables")}
@@ -523,12 +552,13 @@ export function DashboardWorkspace({
             <span className="yc-kpi-icon">
               <Truck aria-hidden="true" />
             </span>
-            <div>
+            <div className="yc-kpi-body">
               <small>我们欠供应商</small>
               <strong>{money(data.payables.outstanding)}</strong>
               <p>{data.payables.count} 笔未结</p>
             </div>
           </button>
+
           <button
             className="yc-kpi-card cash"
             onClick={() => onScreenChange("payables")}
@@ -536,10 +566,10 @@ export function DashboardWorkspace({
             <span className="yc-kpi-icon">
               <Banknote aria-hidden="true" />
             </span>
-            <div>
+            <div className="yc-kpi-body">
               <small>资金余额</small>
               <strong>{money(data.cash.balance)}</strong>
-              <p>{data.cash.accountCount} 个启用账户</p>
+              <p>{data.cash.accountCount} 个账户可用</p>
             </div>
           </button>
         </div>

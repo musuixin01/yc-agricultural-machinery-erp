@@ -10,9 +10,13 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export function CreatePurchaseDialog({
   open,
+  initialLines,
+  initialWarehouseId,
   onClose,
 }: {
   open: boolean;
+  initialLines?: Line[];
+  initialWarehouseId?: string;
   onClose: () => void;
 }) {
   const suppliers = useParties("", "SUPPLIER");
@@ -34,14 +38,23 @@ export function CreatePurchaseDialog({
 
   useEffect(() => {
     if (!open) return;
-    if (!supplierId && suppliers.data?.items.length)
-      setSupplierId(suppliers.data.items[0].id);
-    if (!warehouseId && warehouses.data?.items.length)
+    if (initialLines && initialLines.length > 0) {
+      setLines(initialLines);
+    } else {
+      setLines([{ productId: "", quantity: "", unitPrice: "0" }]);
+    }
+    if (initialWarehouseId) {
+      setWarehouseId(initialWarehouseId);
+    } else if (!warehouseId && warehouses.data?.items.length) {
       setWarehouseId(
         warehouses.data.items.find((item) => item.isDefault)?.id ??
           warehouses.data.items[0].id,
       );
-  }, [open, supplierId, warehouseId, suppliers.data, warehouses.data]);
+    }
+    if (!supplierId && suppliers.data?.items.length) {
+      setSupplierId(suppliers.data.items[0].id);
+    }
+  }, [open, initialLines, initialWarehouseId, suppliers.data, warehouses.data]);
   useEffect(() => {
     const supplier = suppliers.data?.items.find(
       (item) => item.id === supplierId,

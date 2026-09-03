@@ -7,6 +7,8 @@ import {
   Plus,
   ReceiptText,
   RotateCcw,
+  Send,
+  ShieldAlert,
   WalletCards,
 } from "lucide-react";
 import { useCashAccounts } from "../payables/use-payables";
@@ -14,6 +16,12 @@ import { CreateCustomerReceiptDialog } from "./CreateCustomerReceiptDialog";
 import { CreateReceiptReversalDialog } from "./CreateReceiptReversalDialog";
 import { CreateCustomerAdvanceDialog } from "./CreateCustomerAdvanceDialog";
 import { ApplyCustomerAdvanceDialog } from "./ApplyCustomerAdvanceDialog";
+import { ReceivablesAgingDialog } from "./ReceivablesAgingDialog";
+import { CustomerDunningNoticeDialog } from "./CustomerDunningNoticeDialog";
+import {
+  analyzeReceivablesAging,
+  type CustomerAgingSummary,
+} from "./receivables-aging";
 import type { CustomerAdvance, CustomerReceipt } from "./receivables-api";
 import {
   useCustomerAdvances,
@@ -54,6 +62,9 @@ export function ReceivablesWorkspace({
   const [statementCustomerId, setStatementCustomerId] = useState<
     string | undefined
   >();
+  const [agingOpen, setAgingOpen] = useState(false);
+  const [dunningSummary, setDunningSummary] =
+    useState<CustomerAgingSummary | null>(null);
   const [customerId, setCustomerId] = useState<string | undefined>();
   const [reversing, setReversing] = useState<CustomerReceipt | null>(null);
   const [receiptVoucher, setReceiptVoucher] = useState<CustomerReceipt | null>(
@@ -87,6 +98,17 @@ export function ReceivablesWorkspace({
     setStatementOpen(true);
   }
 
+  function openDunningForCustomer(targetCustomerId: string) {
+    if (!entries.data?.items) return;
+    const overview = analyzeReceivablesAging(entries.data.items);
+    const summary = overview.customerSummaries.find(
+      (c) => c.customerId === targetCustomerId,
+    );
+    if (summary) {
+      setDunningSummary(summary);
+    }
+  }
+
   return (
     <div
       className={`payables-workspace receivables-workspace payables-${layout}`}
@@ -114,7 +136,15 @@ export function ReceivablesWorkspace({
           </span>
         </div>
         <div className="payables-actions">
-          <button className="primary-button" onClick={() => receive()}>
+          <button
+            className="primary-button aging-action-highlight-btn"
+            onClick={() => setAgingOpen(true)}
+            title="查看应收账款账龄梯级分析及逾期催款中心"
+          >
+            <Clock3 />
+            账龄分析与催款
+          </button>
+          <button className="outline-button" onClick={() => receive()}>
             <Plus />
             登记客户收款
           </button>
@@ -195,6 +225,16 @@ export function ReceivablesWorkspace({
                   >
                     查看对账单
                   </button>
+                  {entry.dueDate < new Date().toISOString().slice(0, 10) && (
+                    <button
+                      className="outline-button dunning-card-btn"
+                      onClick={() => openDunningForCustomer(entry.customer.id)}
+                      title="生成此客户催款函"
+                    >
+                      <Send size={13} />
+                      催款函
+                    </button>
+                  )}
                 </footer>
               </article>
             ))}
@@ -343,6 +383,18 @@ export function ReceivablesWorkspace({
           />
         </Suspense>
       )}
+      <ReceivablesAgingDialog
+        open={agingOpen}
+        entries={entries.data?.items ?? []}
+        onClose={() => setAgingOpen(false)}
+        onOpenReceipt={(cId) => receive(cId)}
+        onOpenStatement={(cId) => reconcile(cId)}
+      />
+      <CustomerDunningNoticeDialog
+        open={dunningSummary !== null}
+        summary={dunningSummary}
+        onClose={() => setDunningSummary(null)}
+      />
     </div>
   );
 }

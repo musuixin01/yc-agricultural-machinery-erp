@@ -126,7 +126,7 @@ export function SalesWorkspace({ layout }: { layout: "desktop" | "mobile" }) {
           </span>
           <span>
             <small>销售退货</small>
-            <strong>¥{money(returns.data?.summary.totalAmount ?? 0)}</strong>
+            <strong>¥{money(returns.data?.summary?.totalAmount ?? 0)}</strong>
           </span>
         </div>
         <button className="primary-button" onClick={() => setCreating(true)}>

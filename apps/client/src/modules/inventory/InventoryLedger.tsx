@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  ArrowRightLeft,
   ChevronLeft,
   ChevronRight,
   Check,
@@ -19,16 +20,20 @@ import {
 import { useAuth } from "../auth/AuthGate";
 import type {
   InventoryLedgerSourceType,
+  InventoryTransferDocument,
   OpeningDocument,
 } from "./inventory-api";
 import type { InventoryStocktake } from "./inventory-api";
 import type { InventoryDamageDocument } from "./inventory-api";
 import { InventoryDamageDialog } from "./InventoryDamageDialog";
 import { StocktakeDialog } from "./StocktakeDialog";
+import { TransferDialog } from "./TransferDialog";
+import { LowStockRestockDialog } from "./LowStockRestockDialog";
 import {
   useInventoryBalances,
   useInventoryDamages,
   useInventoryLedger,
+  useInventoryTransfers,
   useOpeningDocuments,
   usePostOpening,
   useStocktakes,
@@ -47,6 +52,8 @@ const ledgerSourceLabel: Record<InventoryLedgerSourceType, string> = {
   STOCKTAKE_GAIN: "盘盈",
   STOCKTAKE_LOSS: "盘亏",
   INVENTORY_DAMAGE: "库存报损",
+  TRANSFER_OUT: "调拨出库",
+  TRANSFER_IN: "调拨入库",
 };
 
 const statusLabel = {
@@ -64,12 +71,16 @@ export function InventoryLedger({ layout }: { layout: "desktop" | "mobile" }) {
   const [search, setSearch] = useState("");
   const [onlyLow, setOnlyLow] = useState(false);
   const [error, setError] = useState("");
+  const [restockOpen, setRestockOpen] = useState(false);
   const [stocktakeOpen, setStocktakeOpen] = useState(false);
   const [selectedStocktake, setSelectedStocktake] =
     useState<InventoryStocktake | null>(null);
   const [damageOpen, setDamageOpen] = useState(false);
   const [selectedDamage, setSelectedDamage] =
     useState<InventoryDamageDocument | null>(null);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [selectedTransfer, setSelectedTransfer] =
+    useState<InventoryTransferDocument | null>(null);
   const [ledgerKeyword, setLedgerKeyword] = useState("");
   const [ledgerSearch, setLedgerSearch] = useState("");
   const [ledgerSource, setLedgerSource] = useState<
@@ -82,6 +93,7 @@ export function InventoryLedger({ layout }: { layout: "desktop" | "mobile" }) {
   const post = usePostOpening();
   const stocktakes = useStocktakes();
   const damages = useInventoryDamages();
+  const transfers = useInventoryTransfers();
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setLedgerSearch(ledgerKeyword.trim());
@@ -167,13 +179,23 @@ export function InventoryLedger({ layout }: { layout: "desktop" | "mobile" }) {
               placeholder="搜索商品名称、编号或仓库"
             />
           </label>
-          <button
-            type="button"
-            className={onlyLow ? "active" : ""}
-            onClick={() => setOnlyLow((current) => !current)}
-          >
-            只看库存不足 {lowCount ? `(${lowCount})` : ""}
-          </button>
+          <div className="inventory-balance-toolbar-actions">
+            <button
+              type="button"
+              className={onlyLow ? "active" : ""}
+              onClick={() => setOnlyLow((current) => !current)}
+            >
+              只看库存不足 {lowCount ? `(${lowCount})` : ""}
+            </button>
+            <button
+              type="button"
+              className="inventory-restock-btn"
+              onClick={() => setRestockOpen(true)}
+            >
+              <AlertTriangle size={15} /> 预警补货中心{" "}
+              {lowCount ? `(${lowCount})` : ""}
+            </button>
+          </div>
         </div>
       )}
       <div className="balance-list">
@@ -568,6 +590,74 @@ export function InventoryLedger({ layout }: { layout: "desktop" | "mobile" }) {
               </div>
             )}
           </section>
+          <section className="a-panel ledger-panel transfer-panel">
+            <header>
+              <div>
+                <h2>跨仓调拨</h2>
+                <p>总仓库、分库与专库之间商品移库调拨</p>
+              </div>
+              <button
+                type="button"
+                className="transfer-create-button"
+                onClick={() => {
+                  setSelectedTransfer(null);
+                  setTransferOpen(true);
+                }}
+              >
+                <ArrowRightLeft aria-hidden="true" /> 新建调拨
+              </button>
+            </header>
+            {transfers.isLoading && (
+              <div className="catalog-state">正在加载调拨记录…</div>
+            )}
+            {transfers.isError && (
+              <div className="catalog-state error">调拨记录加载失败</div>
+            )}
+            <div className="transfer-document-list">
+              {transfers.data?.items.map((item) => (
+                <button
+                  type="button"
+                  key={item.id}
+                  onClick={() => {
+                    setSelectedTransfer(item);
+                    setTransferOpen(true);
+                  }}
+                >
+                  <span
+                    className={`ledger-status ${item.status.toLowerCase()}`}
+                  >
+                    {item.status === "DRAFT"
+                      ? "草稿"
+                      : item.status === "SUBMITTED"
+                        ? "待过账"
+                        : "已过账"}
+                  </span>
+                  <span>
+                    <b>{item.documentNumber}</b>
+                    <small>
+                      {item.sourceWarehouse.name} → {item.targetWarehouse.name}{" "}
+                      · {item.businessDate}
+                    </small>
+                  </span>
+                  <span>
+                    <b>{item.lines.length} 种商品</b>
+                    <small>
+                      {item.status === "POSTED"
+                        ? `成本 ¥${Number(item.totalAmount).toLocaleString("zh-CN")}`
+                        : "查看明细"}
+                    </small>
+                  </span>
+                </button>
+              ))}
+            </div>
+            {!transfers.isLoading && transfers.data?.items.length === 0 && (
+              <div className="ledger-empty compact">
+                <ArrowRightLeft aria-hidden="true" />
+                <strong>还没有调拨记录</strong>
+                <span>支持主库与分库之间商品调动并自动增减两仓库存。</span>
+              </div>
+            )}
+          </section>
           <div className="ledger-grid">
             <section className="a-panel ledger-panel">
               <header>
@@ -662,6 +752,16 @@ export function InventoryLedger({ layout }: { layout: "desktop" | "mobile" }) {
         document={selectedDamage}
         onChange={(item) => setSelectedDamage(item)}
         onClose={() => setDamageOpen(false)}
+      />
+      <TransferDialog
+        open={transferOpen}
+        document={selectedTransfer}
+        onChange={(item) => setSelectedTransfer(item)}
+        onClose={() => setTransferOpen(false)}
+      />
+      <LowStockRestockDialog
+        open={restockOpen}
+        onClose={() => setRestockOpen(false)}
       />
     </div>
   );

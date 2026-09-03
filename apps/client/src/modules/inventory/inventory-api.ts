@@ -1,7 +1,6 @@
 import { authenticatedFetch } from "../auth/auth-api";
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000/api/v1";
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
 
 export type InventoryStatus =
   "DRAFT" | "SUBMITTED" | "POSTED" | "REVERSED" | "CANCELLED";
@@ -57,7 +56,9 @@ export type InventoryLedgerSourceType =
   | "SALES_REVERSAL"
   | "STOCKTAKE_GAIN"
   | "STOCKTAKE_LOSS"
-  | "INVENTORY_DAMAGE";
+  | "INVENTORY_DAMAGE"
+  | "TRANSFER_OUT"
+  | "TRANSFER_IN";
 export type InventoryLedgerEntry = {
   id: string;
   sourceDocumentId: string;
@@ -180,6 +181,51 @@ export type UpdateInventoryDamageInput = {
   input: InventoryDamageInput;
 };
 
+export type InventoryTransferLine = {
+  id: string;
+  product: { id: string; code: string; name: string };
+  productNameSnapshot: string;
+  unitNameSnapshot: string;
+  quantity: string;
+  unitCost: string;
+  lineAmount: string;
+};
+
+export type InventoryTransferDocument = {
+  id: string;
+  documentNumber: string;
+  status: "DRAFT" | "SUBMITTED" | "POSTED" | "CANCELLED";
+  businessDate: string;
+  notes: string | null;
+  version: number;
+  totalAmount: string;
+  sourceWarehouse: { id: string; code: string; name: string };
+  targetWarehouse: { id: string; code: string; name: string };
+  createdBy: { id: string; displayName: string };
+  submittedBy: { id: string; displayName: string } | null;
+  postedBy: { id: string; displayName: string } | null;
+  submittedAt: string | null;
+  postedAt: string | null;
+  lines: InventoryTransferLine[];
+};
+
+export type CreateTransferInput = {
+  sourceWarehouseId: string;
+  targetWarehouseId: string;
+  businessDate: string;
+  notes?: string;
+  lines: {
+    productId: string;
+    quantity: string;
+    unitCost?: string;
+  }[];
+};
+
+export type UpdateTransferInput = {
+  document: InventoryTransferDocument;
+  input: CreateTransferInput;
+};
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await authenticatedFetch(`${API_BASE}${path}`, {
     ...init,
@@ -285,6 +331,31 @@ export const inventoryApi = {
   post: (document: OpeningDocument) =>
     request<OpeningDocument>(
       `/inventory/opening-documents/${document.id}/post`,
+      {
+        method: "POST",
+        headers: { "Idempotency-Key": crypto.randomUUID() },
+      },
+    ),
+  transfers: () =>
+    request<{ items: InventoryTransferDocument[] }>("/inventory/transfers"),
+  createTransfer: (input: CreateTransferInput) =>
+    request<InventoryTransferDocument>("/inventory/transfers", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  updateTransfer: ({ document, input }: UpdateTransferInput) =>
+    request<InventoryTransferDocument>(`/inventory/transfers/${document.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ ...input, version: document.version }),
+    }),
+  submitTransfer: (document: InventoryTransferDocument) =>
+    request<InventoryTransferDocument>(
+      `/inventory/transfers/${document.id}/submit?version=${document.version}`,
+      { method: "POST" },
+    ),
+  postTransfer: (document: InventoryTransferDocument) =>
+    request<InventoryTransferDocument>(
+      `/inventory/transfers/${document.id}/post`,
       {
         method: "POST",
         headers: { "Idempotency-Key": crypto.randomUUID() },

@@ -1,15 +1,20 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  Banknote,
   ClipboardCheck,
+  FileText,
   PackageCheck,
   Plus,
+  Printer,
   RotateCcw,
   Truck,
   WalletCards,
 } from "lucide-react";
 import { CreatePurchaseDialog } from "./CreatePurchaseDialog";
 import { CreatePurchaseReturnDialog } from "./CreatePurchaseReturnDialog";
+import { LowStockRestockDialog } from "../inventory/LowStockRestockDialog";
+import { PurchaseReceiptPrintDialog } from "./PurchaseReceiptPrintDialog";
 import type { PurchaseReceipt } from "./purchasing-api";
 import {
   usePayables,
@@ -18,6 +23,14 @@ import {
   usePurchaseReturns,
   useSubmitPurchase,
 } from "./use-purchasing";
+import { useInventoryBalances } from "../inventory/use-inventory";
+import { CreateSupplierPaymentDialog } from "../payables/CreateSupplierPaymentDialog";
+
+const SupplierStatementDialog = lazy(() =>
+  import("../payables/SupplierStatementDialog").then((module) => ({
+    default: module.SupplierStatementDialog,
+  })),
+);
 
 const labels = {
   DRAFT: "草稿",
@@ -36,13 +49,38 @@ export function PurchasingWorkspace({
 }) {
   const [creating, setCreating] = useState(false);
   const [returning, setReturning] = useState<PurchaseReceipt | null>(null);
+  const [paymentSupplierId, setPaymentSupplierId] = useState<string | null>(
+    null,
+  );
+  const [statementSupplierId, setStatementSupplierId] = useState<string | null>(
+    null,
+  );
+  const [printingReceipt, setPrintingReceipt] =
+    useState<PurchaseReceipt | null>(null);
+  const [restockOpen, setRestockOpen] = useState(false);
+  const [initialPurchaseLines, setInitialPurchaseLines] = useState<
+    { productId: string; quantity: string; unitPrice: string }[] | undefined
+  >(undefined);
+  const [initialPurchaseWh, setInitialPurchaseWh] = useState<
+    string | undefined
+  >(undefined);
   const [error, setError] = useState("");
   const receipts = usePurchaseReceipts();
   const payables = usePayables();
   const returns = usePurchaseReturns();
+  const balances = useInventoryBalances();
   const submit = useSubmitPurchase();
   const post = usePostPurchase();
   const pending = submit.isPending || post.isPending;
+
+  const lowStockCount = useMemo(() => {
+    return (
+      balances.data?.items.filter(
+        (item) =>
+          Number(item.quantity) <= Number(item.product.safetyStock || 0),
+      ).length ?? 0
+    );
+  }, [balances.data]);
   const payableTotal = useMemo(
     () =>
       payables.data?.items.reduce(
@@ -86,8 +124,15 @@ export function PurchasingWorkspace({
             <small>采购单</small>
             <strong>{receipts.data?.items.length ?? "—"}</strong>
           </span>
-          <span>
-            <small>我们欠供应商</small>
+          <span
+            className="cursor-pointer"
+            onClick={() => {
+              if (onOpenPayables) onOpenPayables();
+              else setPaymentSupplierId("");
+            }}
+            title="点击前往供应商付款结算"
+          >
+            <small>我们欠供应商（点击付款）</small>
             <strong>
               ¥
               {payableTotal.toLocaleString("zh-CN", {
@@ -97,10 +142,22 @@ export function PurchasingWorkspace({
             </strong>
           </span>
         </div>
-        <button className="primary-button" onClick={() => setCreating(true)}>
-          <Plus />
-          新建采购入库
-        </button>
+        <div className="purchase-hero-actions">
+          {lowStockCount > 0 && (
+            <button
+              className="purchase-restock-trigger"
+              onClick={() => setRestockOpen(true)}
+              type="button"
+            >
+              <AlertTriangle size={16} />
+              缺货智能补货 ({lowStockCount})
+            </button>
+          )}
+          <button className="primary-button" onClick={() => setCreating(true)}>
+            <Plus />
+            新建采购入库
+          </button>
+        </div>
       </section>
       <section className="purchase-flow">
         <span>
@@ -181,10 +238,35 @@ export function PurchasingWorkspace({
                     <>
                       <span>{receipt.postedBy?.displayName} 已过账</span>
                       <button
+                        className="purchase-print-btn"
+                        onClick={() => setPrintingReceipt(receipt)}
+                        title="打印采购入库单凭证"
+                      >
+                        <Printer size={13} /> 打印
+                      </button>
+                      <button
+                        className="purchase-statement-btn"
+                        onClick={() =>
+                          setStatementSupplierId(receipt.supplier.id)
+                        }
+                        title="查看该供应商对账流水"
+                      >
+                        <FileText size={13} /> 对账
+                      </button>
+                      <button
+                        className="purchase-pay-btn"
+                        onClick={() =>
+                          setPaymentSupplierId(receipt.supplier.id)
+                        }
+                        title="登记付款给此供应商"
+                      >
+                        <Banknote size={13} /> 付款
+                      </button>
+                      <button
                         className="purchase-return-button"
                         onClick={() => setReturning(receipt)}
                       >
-                        <RotateCcw /> 采购退货
+                        <RotateCcw size={13} /> 采购退货
                       </button>
                     </>
                   )}
@@ -209,15 +291,28 @@ export function PurchasingWorkspace({
             </div>
             <WalletCards />
           </header>
-          {onOpenPayables && (
+          {onOpenPayables ? (
             <button className="purchase-payables-link" onClick={onOpenPayables}>
               去给供应商付款
+              <span>→</span>
+            </button>
+          ) : (
+            <button
+              className="purchase-payables-link"
+              onClick={() => setPaymentSupplierId("")}
+            >
+              登记供应商付款
               <span>→</span>
             </button>
           )}
           <div className="payable-list">
             {payables.data?.items.map((item) => (
-              <article key={item.id}>
+              <article
+                key={item.id}
+                className="payable-item-clickable"
+                onClick={() => setPaymentSupplierId(item.supplier.id)}
+                title="点击为该供应商登记付款核销"
+              >
                 <span>{item.supplier.name.slice(0, 1)}</span>
                 <div>
                   <strong>{item.supplier.name}</strong>
@@ -248,7 +343,7 @@ export function PurchasingWorkspace({
               <h2>最近采购退货</h2>
               <p>
                 累计退货 ¥
-                {Number(returns.data.summary.totalAmount).toLocaleString(
+                {Number(returns.data?.summary?.totalAmount ?? 0).toLocaleString(
                   "zh-CN",
                   { minimumFractionDigits: 2 },
                 )}
@@ -280,13 +375,49 @@ export function PurchasingWorkspace({
       )}
       <CreatePurchaseDialog
         open={creating}
-        onClose={() => setCreating(false)}
+        initialLines={initialPurchaseLines}
+        initialWarehouseId={initialPurchaseWh}
+        onClose={() => {
+          setCreating(false);
+          setInitialPurchaseLines(undefined);
+          setInitialPurchaseWh(undefined);
+        }}
+      />
+      <LowStockRestockDialog
+        open={restockOpen}
+        onClose={() => setRestockOpen(false)}
+        onOpenPurchaseWithLines={(lines, whId) => {
+          setInitialPurchaseLines(lines);
+          setInitialPurchaseWh(whId);
+          setCreating(true);
+        }}
       />
       <CreatePurchaseReturnDialog
         document={returning}
         returns={returns.data?.items ?? []}
         onClose={() => setReturning(null)}
       />
+      <PurchaseReceiptPrintDialog
+        open={printingReceipt !== null}
+        receipt={printingReceipt}
+        onClose={() => setPrintingReceipt(null)}
+      />
+      {paymentSupplierId !== null && (
+        <CreateSupplierPaymentDialog
+          open={paymentSupplierId !== null}
+          initialSupplierId={paymentSupplierId || undefined}
+          onClose={() => setPaymentSupplierId(null)}
+        />
+      )}
+      {statementSupplierId && (
+        <Suspense fallback={null}>
+          <SupplierStatementDialog
+            open
+            initialSupplierId={statementSupplierId}
+            onClose={() => setStatementSupplierId(null)}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

@@ -1,21 +1,21 @@
 {
   "name": "yc-agricultural-machinery-erp",
   "private": true,
-  "packageManager": "pnpm@9.15.0",
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
-    "dev": "pnpm --parallel --filter @yc-erp/api --filter @yc-erp/client dev",
-    "client": "pnpm --dir apps/client dev",
-    "client:build": "pnpm --dir apps/client build",
-    "api": "pnpm --dir apps/api start:dev",
-    "api:build": "pnpm --dir apps/api build",
+    "dev": "npm run dev --workspace=@yc-erp/client",
+    "build": "npm run build --workspace=@yc-erp/client",
+    "preview": "npm run preview --workspace=@yc-erp/client",
+    "client": "npm run dev --workspace=@yc-erp/client",
+    "client:build": "npm run build --workspace=@yc-erp/client",
+    "lint": "prettier --check \"apps/client/src/**/*.{ts,tsx,css,json}\"",
     "format": "prettier --write \"apps/**/*.{ts,tsx,css,json}\"",
-    "format:check": "prettier --check \"apps/**/*.{ts,tsx,css,json}\"",
-    "test": "pnpm -r test",
-    "db:generate": "pnpm --dir apps/api prisma:generate",
-    "db:migrate": "pnpm --dir apps/api prisma:migrate",
-    "db:seed": "pnpm --dir apps/api prisma:seed"
+    "format:check": "prettier --check \"apps/**/*.{ts,tsx,css,json}\""
   },
   "devDependencies": {
-    "prettier": "^3.9.6"
+    "prettier": "^3.9.6",
+    "vitest": "^4.1.11"
   }
 }

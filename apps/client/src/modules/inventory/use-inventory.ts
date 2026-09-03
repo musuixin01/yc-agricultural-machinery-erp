@@ -11,6 +11,9 @@ import {
   type OpeningInput,
   type SaveStocktakeCountsInput,
   type UpdateInventoryDamageInput,
+  type InventoryTransferDocument,
+  type CreateTransferInput,
+  type UpdateTransferInput,
 } from "./inventory-api";
 
 export function useOpeningDocuments() {
@@ -106,4 +109,37 @@ export function usePostInventoryDamage() {
   return useInventoryMutation<InventoryDamageDocument, InventoryDamageDocument>(
     inventoryApi.postDamage,
   );
+}
+
+export function useInventoryTransfers() {
+  return useQuery({
+    queryKey: ["inventory", "transfers"],
+    queryFn: inventoryApi.transfers,
+  });
+}
+
+export function useCreateInventoryTransfer() {
+  return useInventoryMutation<CreateTransferInput, InventoryTransferDocument>(
+    inventoryApi.createTransfer,
+  );
+}
+
+export function useUpdateInventoryTransfer() {
+  return useInventoryMutation<UpdateTransferInput, InventoryTransferDocument>(
+    inventoryApi.updateTransfer,
+  );
+}
+
+export function useSubmitInventoryTransfer() {
+  return useInventoryMutation<
+    InventoryTransferDocument,
+    InventoryTransferDocument
+  >(inventoryApi.submitTransfer);
+}
+
+export function usePostInventoryTransfer() {
+  return useInventoryMutation<
+    InventoryTransferDocument,
+    InventoryTransferDocument
+  >(inventoryApi.postTransfer);
 }

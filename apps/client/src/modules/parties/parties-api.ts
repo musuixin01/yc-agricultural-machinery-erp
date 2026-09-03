@@ -1,5 +1,4 @@
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000/api/v1";
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
 import { authenticatedFetch } from "../auth/auth-api";
 export type PartyRole = "CUSTOMER" | "SUPPLIER";
 export type PartyStatus = "ACTIVE" | "INACTIVE";
@@ -78,10 +77,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const partiesApi = {
   list: (search: string, role: string) =>
     request<PartyPage>(
-      `/parties?page=1&pageSize=50${search ? `&search=${encodeURIComponent(search)}` : ""}${role ? `&role=${role}` : ""}`,
+      `/parties?page=1&pageSize=100${search ? `&search=${encodeURIComponent(search)}` : ""}${role ? `&role=${role}` : ""}`,
     ),
   create: (input: CreatePartyInput) =>
     request<Party>("/parties", { method: "POST", body: JSON.stringify(input) }),
+  update: (
+    id: string,
+    input: Partial<CreatePartyInput> & { version?: number },
+  ) =>
+    request<Party>(`/parties/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
+  batchImport: (parties: CreatePartyInput[]) =>
+    request<{ count: number; items: Party[] }>("/parties/batch", {
+      method: "POST",
+      body: JSON.stringify({ parties }),
+    }),
   setStatus: (party: Party, status: PartyStatus) =>
     request<Party>(`/parties/${party.id}/status`, {
       method: "PATCH",

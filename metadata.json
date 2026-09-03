@@ -1,0 +1,6 @@
+{
+  "name": "玉春 YC · 农机经营管理",
+  "description": "玉春 YC 农机经营管理系统，支持商品、客户、供应商、库存账本、销售开单、采购与往来账管理",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -5,6 +5,9 @@ import {
   CircleDollarSign,
   ClipboardList,
   Cloud,
+  Download,
+  Barcode,
+  FileSpreadsheet,
   LayoutDashboard,
   Menu,
   PackageCheck,
@@ -13,11 +16,13 @@ import {
   ScanLine,
   Search,
   Settings,
+  ShieldAlert,
   ShoppingCart,
   Store,
   Tractor,
   TrendingUp,
   Truck,
+  Upload,
   UsersRound,
   WalletCards,
 } from "lucide-react";
@@ -25,6 +30,7 @@ import { activities, debts, metrics, type Screen } from "../mockData";
 import { lazy, Suspense, useState } from "react";
 import { CreateProductDialog } from "../modules/catalog/CreateProductDialog";
 import { EditProductDialog } from "../modules/catalog/EditProductDialog";
+import { ProductBarcodePrintDialog } from "../modules/catalog/ProductBarcodePrintDialog";
 import type { Product } from "../modules/catalog/catalog-api";
 import {
   useCatalogReferences,
@@ -32,6 +38,10 @@ import {
   useSetProductStatus,
 } from "../modules/catalog/use-catalog";
 import { CreatePartyDialog } from "../modules/parties/CreatePartyDialog";
+import { EditPartyDialog } from "../modules/parties/EditPartyDialog";
+import { BatchImportPartiesDialog } from "../modules/parties/BatchImportPartiesDialog";
+import { exportPartiesToCsv } from "../modules/parties/parties-export";
+import type { Party } from "../modules/parties/parties-api";
 import { useParties, useSetPartyStatus } from "../modules/parties/use-parties";
 import { CreateWarehouseDialog } from "../modules/warehouses/CreateWarehouseDialog";
 import {
@@ -51,6 +61,11 @@ import { DashboardWorkspace } from "../modules/dashboard/DashboardWorkspace";
 const CustomerStatementDialog = lazy(() =>
   import("../modules/receivables/CustomerStatementDialog").then((module) => ({
     default: module.CustomerStatementDialog,
+  })),
+);
+const SupplierStatementDialog = lazy(() =>
+  import("../modules/payables/SupplierStatementDialog").then((module) => ({
+    default: module.SupplierStatementDialog,
   })),
 );
 
@@ -598,6 +613,9 @@ function AInventory() {
   const [productStatus, setProductStatus] = useState("");
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
+  const [barcodePrintProducts, setBarcodePrintProducts] = useState<
+    Product[] | null
+  >(null);
   const products = useProducts(search, categoryId, productStatus);
   const references = useCatalogReferences();
   const status = useSetProductStatus();
@@ -626,13 +644,24 @@ function AInventory() {
             </strong>
           </span>
         </div>
-        <button
-          className="primary-button catalog-add"
-          onClick={() => setCreating(true)}
-        >
-          <Plus size={17} />
-          新增商品
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="outline-button inline-flex items-center gap-1.5 text-xs py-2 px-3.5 rounded-lg border-emerald-600 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 font-semibold shadow-sm transition-all"
+            onClick={() => setBarcodePrintProducts(products.data?.items ?? [])}
+            title="一键将当前商品列表批量生成条码/二维码标签"
+          >
+            <Barcode size={16} className="text-emerald-700" />
+            批量条码标签打印
+          </button>
+          <button
+            className="primary-button catalog-add"
+            onClick={() => setCreating(true)}
+          >
+            <Plus size={17} />
+            新增商品
+          </button>
+        </div>
       </section>
       <section className="a-panel table-panel catalog-workspace">
         <header className="catalog-toolbar-a">
@@ -760,14 +789,24 @@ function AInventory() {
                       </button>
                     </td>
                     <td>
-                      <button
-                        className="catalog-edit-button"
-                        onClick={() => setEditing(p)}
-                        aria-label={`编辑 ${p.name}`}
-                      >
-                        <Pencil size={15} />
-                        编辑
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          className="catalog-edit-button text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
+                          onClick={() => setBarcodePrintProducts([p])}
+                          title={`打印 ${p.name} 条码标签`}
+                        >
+                          <Barcode size={15} />
+                          打标
+                        </button>
+                        <button
+                          className="catalog-edit-button"
+                          onClick={() => setEditing(p)}
+                          aria-label={`编辑 ${p.name}`}
+                        >
+                          <Pencil size={15} />
+                          编辑
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -781,6 +820,12 @@ function AInventory() {
       </section>
       <CreateProductDialog open={creating} onClose={() => setCreating(false)} />
       <EditProductDialog product={editing} onClose={() => setEditing(null)} />
+      <ProductBarcodePrintDialog
+        open={Boolean(barcodePrintProducts)}
+        initialProducts={barcodePrintProducts ?? []}
+        allProducts={products.data?.items ?? []}
+        onClose={() => setBarcodePrintProducts(null)}
+      />
     </div>
   );
 }
@@ -788,33 +833,73 @@ function AInventory() {
 function AParties() {
   const [search, setSearch] = useState("");
   const [role, setRole] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [creditFilter, setCreditFilter] = useState("");
   const [creating, setCreating] = useState(false);
+  const [editingParty, setEditingParty] = useState<Party | null>(null);
+  const [batchImporting, setBatchImporting] = useState(false);
   const [statementCustomerId, setStatementCustomerId] = useState<string | null>(
+    null,
+  );
+  const [statementSupplierId, setStatementSupplierId] = useState<string | null>(
     null,
   );
   const parties = useParties(search, role);
   const status = useSetPartyStatus();
+
   const roleText = (roles: string[]) =>
     roles.length === 2
       ? "客户 · 供应商"
       : roles[0] === "CUSTOMER"
         ? "客户"
         : "供应商";
+
+  // Filter items by status and credit type client-side if selected
+  const filteredItems = (parties.data?.items || []).filter((p) => {
+    if (statusFilter && p.status !== statusFilter) return false;
+    if (creditFilter === "CREDIT" && Number(p.creditLimit || 0) <= 0)
+      return false;
+    if (creditFilter === "CASH" && Number(p.creditLimit || 0) > 0) return false;
+    return true;
+  });
+
   return (
     <>
       <PageIntro
         eyebrow="基础资料 / 往来单位"
-        title="客户与供应商"
+        title="客户与供应商档案"
         description={
           parties.data
-            ? `共 ${parties.data.total} 个往来单位；欠款余额由往来账模块独立计算。`
+            ? `共 ${parties.data.total} 位往来单位档案，支持信用额度、账期风控与批量数据导入导出。`
             : "正在读取往来单位…"
         }
         action={
-          <button className="primary-button" onClick={() => setCreating(true)}>
-            <Plus size={17} />
-            新增往来单位
-          </button>
+          <div className="table-actions-group">
+            <button
+              className="outline-button"
+              onClick={() => setBatchImporting(true)}
+              title="批量导入客户或供应商档案"
+            >
+              <FileSpreadsheet size={16} />
+              批量导入
+            </button>
+            <button
+              className="outline-button"
+              onClick={() => exportPartiesToCsv(filteredItems)}
+              disabled={filteredItems.length === 0}
+              title="导出当前筛选结果为 CSV 表格"
+            >
+              <Download size={16} />
+              导出表格
+            </button>
+            <button
+              className="primary-button"
+              onClick={() => setCreating(true)}
+            >
+              <Plus size={17} />
+              新增往来单位
+            </button>
+          </div>
         }
       />
       <section className="a-panel table-panel">
@@ -825,7 +910,7 @@ function AParties() {
               name="partySearch"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="搜索名称、编码、联系人、电话"
+              placeholder="搜索单位名称、编码、简称、联系人、电话"
             />
           </div>
           <select
@@ -833,9 +918,27 @@ function AParties() {
             value={role}
             onChange={(e) => setRole(e.target.value)}
           >
-            <option value="">全部身份</option>
+            <option value="">全部业务身份</option>
             <option value="CUSTOMER">客户</option>
             <option value="SUPPLIER">供应商</option>
+          </select>
+          <select
+            className="filter-button"
+            value={creditFilter}
+            onChange={(e) => setCreditFilter(e.target.value)}
+          >
+            <option value="">全部结算类型</option>
+            <option value="CREDIT">有授信额度</option>
+            <option value="CASH">现结单位 (无额度)</option>
+          </select>
+          <select
+            className="filter-button"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">全部状态</option>
+            <option value="ACTIVE">正常合作中</option>
+            <option value="INACTIVE">已停用</option>
           </select>
         </div>
         {parties.isLoading && (
@@ -862,9 +965,10 @@ function AParties() {
                 </tr>
               </thead>
               <tbody>
-                {parties.data.items.map((p) => {
+                {filteredItems.map((p) => {
                   const c =
-                    p.contacts.find((x) => x.isPrimary) ?? p.contacts[0];
+                    p.contacts?.find((x) => x.isPrimary) ?? p.contacts?.[0];
+                  const hasCredit = Number(p.creditLimit || 0) > 0;
                   return (
                     <tr key={p.id}>
                       <td>
@@ -883,7 +987,7 @@ function AParties() {
                       </td>
                       <td>
                         <span className="party-role-pill">
-                          {roleText(p.roles)}
+                          {roleText(p.roles || [(p as any).role || "CUSTOMER"])}
                         </span>
                       </td>
                       <td>
@@ -891,7 +995,7 @@ function AParties() {
                           <>
                             <b className="party-contact-name">{c.name}</b>
                             <small className="party-contact-phone">
-                              {c.phone ?? "未填写电话"}
+                              {c.phone || (p as any).phone || "未填写电话"}
                             </small>
                           </>
                         ) : (
@@ -899,15 +1003,28 @@ function AParties() {
                         )}
                       </td>
                       <td>
-                        ¥{" "}
-                        {Number(p.creditLimit).toLocaleString("zh-CN", {
-                          minimumFractionDigits: 2,
-                        })}
+                        <span
+                          className={
+                            hasCredit
+                              ? "party-credit-active"
+                              : "party-credit-zero"
+                          }
+                        >
+                          ¥{" "}
+                          {Number(p.creditLimit || 0).toLocaleString("zh-CN", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </span>
+                        {hasCredit && (
+                          <small className="party-credit-hint">已授信</small>
+                        )}
                       </td>
                       <td>
-                        {p.paymentTermsDays
-                          ? `${p.paymentTermsDays} 天`
-                          : "现结"}
+                        <span className="party-terms-badge">
+                          {p.paymentTermsDays
+                            ? `${p.paymentTermsDays} 天账期`
+                            : "现结 (无账期)"}
+                        </span>
                       </td>
                       <td>
                         <button
@@ -925,39 +1042,79 @@ function AParties() {
                         </button>
                       </td>
                       <td>
-                        {p.roles.includes("CUSTOMER") ? (
+                        <div className="party-actions-cell">
                           <button
-                            className="party-statement-button"
-                            onClick={() => setStatementCustomerId(p.id)}
+                            type="button"
+                            className="party-edit-button"
+                            onClick={() => setEditingParty(p)}
                           >
-                            对账
+                            <Pencil size={13} />
+                            编辑
                           </button>
-                        ) : (
-                          "—"
-                        )}
+                          {(p.roles?.includes("CUSTOMER") ||
+                            (p as any).role === "CUSTOMER") && (
+                            <button
+                              type="button"
+                              className="party-statement-button"
+                              onClick={() => setStatementCustomerId(p.id)}
+                              title="查看客户应收对账单"
+                            >
+                              客户对账
+                            </button>
+                          )}
+                          {(p.roles?.includes("SUPPLIER") ||
+                            (p as any).role === "SUPPLIER") && (
+                            <button
+                              type="button"
+                              className="party-statement-button supplier-statement-btn"
+                              onClick={() => setStatementSupplierId(p.id)}
+                              title="查看供应商应付对账单及付款结算"
+                            >
+                              供应商对账
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-            {parties.data.items.length === 0 && (
+            {filteredItems.length === 0 && (
               <div className="catalog-state">
-                <strong>还没有往来单位</strong>
+                <strong>没有匹配的往来单位</strong>
                 <br />
-                点击“新增往来单位”录入第一位客户或供应商。
+                可调整搜索条件、筛选标签，或点击上方“新增往来单位 / 批量导入”。
               </div>
             )}
           </div>
         )}
       </section>
       <CreatePartyDialog open={creating} onClose={() => setCreating(false)} />
+      <EditPartyDialog
+        party={editingParty}
+        open={!!editingParty}
+        onClose={() => setEditingParty(null)}
+      />
+      <BatchImportPartiesDialog
+        open={batchImporting}
+        onClose={() => setBatchImporting(false)}
+      />
       {statementCustomerId && (
         <Suspense fallback={null}>
           <CustomerStatementDialog
             open
             initialCustomerId={statementCustomerId}
             onClose={() => setStatementCustomerId(null)}
+          />
+        </Suspense>
+      )}
+      {statementSupplierId && (
+        <Suspense fallback={null}>
+          <SupplierStatementDialog
+            open
+            initialSupplierId={statementSupplierId}
+            onClose={() => setStatementSupplierId(null)}
           />
         </Suspense>
       )}

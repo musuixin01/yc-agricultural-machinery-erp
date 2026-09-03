@@ -18,6 +18,29 @@ export function useCreateParty() {
     onSuccess: () => client.invalidateQueries({ queryKey: ["parties"] }),
   });
 }
+export function useUpdateParty() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      input,
+    }: {
+      id: string;
+      input: Partial<CreatePartyInput> & { version?: number };
+    }) => partiesApi.update(id, input),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["parties"] }),
+  });
+}
+
+export function useBatchImportParties() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (parties: CreatePartyInput[]) =>
+      partiesApi.batchImport(parties),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["parties"] }),
+  });
+}
+
 export function useSetPartyStatus() {
   const client = useQueryClient();
   return useMutation({

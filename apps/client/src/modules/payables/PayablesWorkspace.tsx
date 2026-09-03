@@ -442,6 +442,7 @@ export function PayablesWorkspace({
       <CreateSupplierPaymentDialog
         open={creatingPayment}
         onClose={() => setCreatingPayment(false)}
+        onPosted={(p) => setPaymentVoucher(p)}
       />
       <CreatePaymentReversalDialog
         payment={reversingPayment}
