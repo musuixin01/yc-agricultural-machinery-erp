@@ -2,6 +2,26 @@
 
 “玉春”（简称 **YC**）农机经营管理系统，面向个体农机商户管理商品、采购、销售、库存、应收、应付与资金流水。项目已进入正式模块开发阶段，商品、往来、仓库、权限、采购、销售、库存、应收、供应商付款和预付款已使用真实数据库。
 
+## 界面与系统架构预览
+
+<p align="center">
+  <strong>桌面端 · UI 原型</strong><br>
+  <img src="apps/ui-prototype/screenshots/variant-c-desktop.png" alt="玉春 YC 农机 ERP 桌面端 UI 原型" width="960">
+</p>
+
+<table>
+  <tr>
+    <td align="center"><strong>移动端 · 工作台原型</strong><br><img src="apps/ui-prototype/screenshots/variant-c-mobile-fixed.png" alt="玉春 YC 农机 ERP 移动端工作台原型" width="280"></td>
+    <td align="center"><strong>移动端 · 销售开单原型</strong><br><img src="apps/ui-prototype/screenshots/variant-c-sales-mobile.png" alt="玉春 YC 农机 ERP 移动端销售开单原型" width="280"></td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/assets/erp-architecture.svg" alt="玉春 YC 农机 ERP 跨端客户端、业务 API、账本与辅助存储架构图" width="100%">
+</p>
+
+<sub>以上界面图来自仓库内的 UI 原型截图，不代表生产系统部署或真实门店数据。架构图依据 docs/03-architecture.md 绘制；PostgreSQL 才是正式账本唯一事实源。</sub>
+
 ## 项目目标
 
 - 同时提供 Windows 桌面端和 Android/iOS 手机端，核心业务口径一致。
